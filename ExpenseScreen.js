@@ -101,6 +101,21 @@ export default function ExpenseScreen() {
     const sum = list.reduce((acc, it) => acc + Number(it.amount || 0), 0);
     return `$${sum.toFixed(2)}`;
   };
+
+  const getTotalsByCategory = () => {
+    const list = getDisplayedExpenses();
+    const map = {};
+    list.forEach((it) => {
+      const raw = it.category;
+      const cat = raw ? String(raw).trim() : 'Other';
+      const key = cat || 'Other';
+      const amt = Number(it.amount || 0);
+      map[key] = (map[key] || 0) + (Number.isFinite(amt) ? amt : 0);
+    });
+    return Object.entries(map)
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total);
+  };
   const normalizeToISO = (d) => {
     if (!d) return null;
     const s = String(d).replace(/[^0-9]/g, '');
@@ -275,6 +290,16 @@ export default function ExpenseScreen() {
         <Text style={styles.totalValue}>{getFilterSum()}</Text>
       </View>
 
+      <View style={styles.categoryBreakdown}>
+        <Text style={styles.categoryHeader}>By Category ({filter === 'all' ? 'All' : filter === 'week' ? 'This Week' : 'This Month'}):</Text>
+        {getTotalsByCategory().map((c) => (
+          <View style={styles.categoryRow} key={c.category}>
+            <Text style={styles.categoryName}>• {c.category}</Text>
+            <Text style={styles.categoryAmount}>${c.total.toFixed(2)}</Text>
+          </View>
+        ))}
+      </View>
+
       <FlatList
         data={getDisplayedExpenses()}
         keyExtractor={(item) => item.id.toString()}
@@ -379,6 +404,31 @@ const styles = StyleSheet.create({
   totalValue: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '700',
+  },
+  categoryBreakdown: {
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  categoryHeader: {
+    color: '#e5e7eb',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  categoryName: {
+    color: '#e5e7eb',
+    fontSize: 13,
+  },
+  categoryAmount: {
+    color: '#fff',
+    fontSize: 13,
     fontWeight: '700',
   },
   delete: {
