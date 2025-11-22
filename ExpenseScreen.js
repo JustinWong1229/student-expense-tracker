@@ -18,6 +18,8 @@ export default function ExpenseScreen() {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
   const [note, setNote] = useState('');
+  const [date, setDate] = useState('');
+  const [filter, setFilter] = useState('all'); // 'all' | 'week' | 'month'
   const loadExpenses = async () => {
     const rows = await db.getAllAsync(
       'SELECT * FROM expenses ORDER BY id DESC;'
@@ -34,20 +36,24 @@ export default function ExpenseScreen() {
 
     const trimmedCategory = category.trim();
     const trimmedNote = note.trim();
+    const trimmedDate = date.trim();
 
     if (!trimmedCategory) {
       // Category is required
       return;
     }
 
+    const isoDate = normalizeToISO(trimmedDate) || null;
+
     await db.runAsync(
-      'INSERT INTO expenses (amount, category, note) VALUES (?, ?, ?);',
-      [amountNumber, trimmedCategory, trimmedNote || null]
+      'INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?);',
+      [amountNumber, trimmedCategory, trimmedNote || null, isoDate]
     );
 
     setAmount('');
     setCategory('');
     setNote('');
+    setDate('');
 
     loadExpenses();
   };
@@ -55,12 +61,97 @@ export default function ExpenseScreen() {
     await db.runAsync('DELETE FROM expenses WHERE id = ?;', [id]);
     loadExpenses();
   };
-   const renderExpense = ({ item }) => (
+  const isDateInCurrentWeek = (dateStr) => {
+    if (!dateStr) return false;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const now = new Date();
+    const start = new Date(now);
+    // Week starts on Sunday (0)
+    start.setHours(0, 0, 0, 0);
+    start.setDate(now.getDate() - now.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return dt >= start && dt <= end;
+  };
+
+  const isDateInCurrentMonth = (dateStr) => {
+    if (!dateStr) return false;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const now = new Date();
+    return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth();
+  };
+
+  const getDisplayedExpenses = () => {
+    if (filter === 'all') return expenses;
+    return expenses.filter((it) => {
+      const dateVal = it.date;
+      if (!dateVal) return false;
+      if (filter === 'week') return isDateInCurrentWeek(dateVal);
+      if (filter === 'month') return isDateInCurrentMonth(dateVal);
+      return true;
+    });
+  };
+  const normalizeToISO = (d) => {
+    if (!d) return null;
+    const s = String(d).replace(/[^0-9]/g, '');
+
+    // Helper to validate numeric ranges
+    const valid = (y, m, day) => {
+      const yi = parseInt(y, 10);
+      const mi = parseInt(m, 10);
+      const di = parseInt(day, 10);
+      if (Number.isNaN(yi) || Number.isNaN(mi) || Number.isNaN(di)) return false;
+      if (mi < 1 || mi > 12) return false;
+      if (di < 1 || di > 31) return false;
+      return true;
+    };
+
+    // If 8 digits and looks like YYYYMMDD, use that
+    if (s.length === 8) {
+      const maybeYear = s.slice(0, 4);
+      const maybeMonth = s.slice(4, 6);
+      const maybeDay = s.slice(6, 8);
+      const yNum = parseInt(maybeYear, 10);
+      if (yNum >= 1900 && yNum <= 2100 && valid(maybeYear, maybeMonth, maybeDay)) {
+        return `${maybeYear}-${maybeMonth}-${maybeDay}`;
+      }
+      // else fall through and treat as MMDDYYYY
+    }
+
+    // If we have at least 5 digits, assume last 4 are the year
+    if (s.length >= 5) {
+      const year = s.slice(-4);
+      const rest = s.slice(0, -4);
+      const day = rest.slice(-2);
+      const month = rest.slice(0, rest.length - 2) || rest.slice(0, 1);
+
+      const mm = month.padStart(2, '0');
+      const dd = day.padStart(2, '0');
+
+      if (valid(year, mm, dd)) return `${year}-${mm}-${dd}`;
+    }
+
+    return null;
+  };
+
+  const formatDate = (d) => {
+    if (!d) return null;
+    // If already ISO, return as-is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    const iso = normalizeToISO(d);
+    return iso || d;
+  };
+
+  const renderExpense = ({ item }) => (
     <View style={styles.expenseRow}>
       <View style={{ flex: 1 }}>
         <Text style={styles.expenseAmount}>${Number(item.amount).toFixed(2)}</Text>
         <Text style={styles.expenseCategory}>{item.category}</Text>
         {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
+        {item.date ? <Text style={styles.expenseDate}>{formatDate(item.date)}</Text> : null}
       </View>
 
       <TouchableOpacity onPress={() => deleteExpense(item.id)}>
@@ -78,6 +169,17 @@ export default function ExpenseScreen() {
           note TEXT
         );
       `);
+
+      // Ensure a `date` column exists on older databases
+      try {
+        const cols = await db.getAllAsync(`PRAGMA table_info(expenses);`);
+        const hasDate = cols.some((c) => c.name === 'date');
+        if (!hasDate) {
+          await db.runAsync(`ALTER TABLE expenses ADD COLUMN date TEXT;`);
+        }
+      } catch (e) {
+        // If PRAGMA or ALTER fails, ignore and continue — table may not exist yet
+      }
 
       await loadExpenses();
     }
@@ -111,11 +213,41 @@ export default function ExpenseScreen() {
           value={note}
           onChangeText={setNote}
         />
+         <TextInput
+          style={styles.input}
+          placeholder="Date (optional)"
+          placeholderTextColor="#9ca3af"
+          keyboardType="numeric"
+          maxLength={8}
+          value={date}
+          onChangeText={(t) => setDate(t.replace(/[^0-9]/g, ''))}
+        />
         <Button title="Add Expense" onPress={addExpense} />
       </View>
 
+      <View style={styles.filters}>
+        <TouchableOpacity
+          style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
+          onPress={() => setFilter('all')}
+        >
+          <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterButton, filter === 'week' && styles.filterButtonActive]}
+          onPress={() => setFilter('week')}
+        >
+          <Text style={[styles.filterText, filter === 'week' && styles.filterTextActive]}>This Week</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterButton, filter === 'month' && styles.filterButtonActive]}
+          onPress={() => setFilter('month')}
+        >
+          <Text style={[styles.filterText, filter === 'month' && styles.filterTextActive]}>This Month</Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
-        data={expenses}
+        data={getDisplayedExpenses()}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderExpense}
         ListEmptyComponent={
@@ -167,8 +299,34 @@ const styles = StyleSheet.create({
     color: '#e5e7eb',
   },
   expenseNote: {
+    fontSize: 14,
+    color: '#e5e7eb',
+  },
+  expenseDate: {
     fontSize: 12,
+    color: '#ffffff',
+  },
+  filters: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+  },
+  filterButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+  },
+  filterButtonActive: {
+    backgroundColor: '#374151',
+  },
+  filterText: {
     color: '#9ca3af',
+    fontSize: 13,
+  },
+  filterTextActive: {
+    color: '#fff',
+    fontWeight: '700',
   },
   delete: {
     color: '#f87171',
