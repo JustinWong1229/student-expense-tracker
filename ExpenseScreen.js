@@ -20,6 +20,7 @@ export default function ExpenseScreen() {
   const [note, setNote] = useState('');
   const [date, setDate] = useState('');
   const [filter, setFilter] = useState('all'); // 'all' | 'week' | 'month'
+  const [datePreview, setDatePreview] = useState(null);
   const loadExpenses = async () => {
     const rows = await db.getAllAsync(
       'SELECT * FROM expenses ORDER BY id DESC;'
@@ -54,6 +55,7 @@ export default function ExpenseScreen() {
     setCategory('');
     setNote('');
     setDate('');
+    setDatePreview(null);
 
     loadExpenses();
   };
@@ -213,37 +215,54 @@ export default function ExpenseScreen() {
           value={note}
           onChangeText={setNote}
         />
-         <TextInput
+        <TextInput
           style={styles.input}
           placeholder="Date (optional)"
           placeholderTextColor="#9ca3af"
           keyboardType="numeric"
           maxLength={8}
           value={date}
-          onChangeText={(t) => setDate(t.replace(/[^0-9]/g, ''))}
+          onChangeText={(t) => {
+            const clean = t.replace(/[^0-9]/g, '');
+            setDate(clean);
+            const iso = normalizeToISO(clean);
+            setDatePreview(iso || (clean ? 'Invalid date' : null));
+          }}
         />
+        {datePreview ? (
+          <Text style={styles.datePreview}>Preview: {datePreview}</Text>
+        ) : null}
         <Button title="Add Expense" onPress={addExpense} />
       </View>
 
       <View style={styles.filters}>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>All</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'week' && styles.filterButtonActive]}
-          onPress={() => setFilter('week')}
-        >
-          <Text style={[styles.filterText, filter === 'week' && styles.filterTextActive]}>This Week</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'month' && styles.filterButtonActive]}
-          onPress={() => setFilter('month')}
-        >
-          <Text style={[styles.filterText, filter === 'month' && styles.filterTextActive]}>This Month</Text>
-        </TouchableOpacity>
+        {(() => {
+          const allCount = expenses.length;
+          const weekCount = expenses.filter((it) => it.date && isDateInCurrentWeek(it.date)).length;
+          const monthCount = expenses.filter((it) => it.date && isDateInCurrentMonth(it.date)).length;
+          return (
+            <>
+              <TouchableOpacity
+                style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
+                onPress={() => setFilter('all')}
+              >
+                <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>All ({allCount})</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterButton, filter === 'week' && styles.filterButtonActive]}
+                onPress={() => setFilter('week')}
+              >
+                <Text style={[styles.filterText, filter === 'week' && styles.filterTextActive]}>This Week ({weekCount})</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterButton, filter === 'month' && styles.filterButtonActive]}
+                onPress={() => setFilter('month')}
+              >
+                <Text style={[styles.filterText, filter === 'month' && styles.filterTextActive]}>This Month ({monthCount})</Text>
+              </TouchableOpacity>
+            </>
+          );
+        })()}
       </View>
 
       <FlatList
@@ -327,6 +346,12 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: '#fff',
     fontWeight: '700',
+  },
+  datePreview: {
+    color: '#9ca3af',
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 4,
   },
   delete: {
     color: '#f87171',
