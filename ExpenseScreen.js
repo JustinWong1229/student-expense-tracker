@@ -21,6 +21,7 @@ export default function ExpenseScreen() {
   const [date, setDate] = useState('');
   const [filter, setFilter] = useState('all'); // 'all' | 'week' | 'month'
   const [datePreview, setDatePreview] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const loadExpenses = async () => {
     const rows = await db.getAllAsync(
       'SELECT * FROM expenses ORDER BY id DESC;'
@@ -46,10 +47,18 @@ export default function ExpenseScreen() {
 
     const isoDate = normalizeToISO(trimmedDate) || null;
 
-    await db.runAsync(
-      'INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?);',
-      [amountNumber, trimmedCategory, trimmedNote || null, isoDate]
-    );
+    if (editingId) {
+      await db.runAsync(
+        'UPDATE expenses SET amount = ?, category = ?, note = ?, date = ? WHERE id = ?;',
+        [amountNumber, trimmedCategory, trimmedNote || null, isoDate, editingId]
+      );
+      setEditingId(null);
+    } else {
+      await db.runAsync(
+        'INSERT INTO expenses (amount, category, note, date) VALUES (?, ?, ?, ?);',
+        [amountNumber, trimmedCategory, trimmedNote || null, isoDate]
+      );
+    }
 
     setAmount('');
     setCategory('');
@@ -57,7 +66,26 @@ export default function ExpenseScreen() {
     setDate('');
     setDatePreview(null);
 
-    loadExpenses();
+    await loadExpenses();
+  };
+
+  const startEdit = (item) => {
+    setEditingId(item.id);
+    setAmount(String(item.amount));
+    setCategory(item.category || '');
+    setNote(item.note || '');
+    // store digits only in input, preview shows normalized
+    setDate(item.date ? String(item.date).replace(/[^0-9]/g, '') : '');
+    setDatePreview(item.date || null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setAmount('');
+    setCategory('');
+    setNote('');
+    setDate('');
+    setDatePreview(null);
   };
   const deleteExpense = async (id) => {
     await db.runAsync('DELETE FROM expenses WHERE id = ?;', [id]);
@@ -176,9 +204,14 @@ export default function ExpenseScreen() {
         {item.date ? <Text style={styles.expenseDate}>{formatDate(item.date)}</Text> : null}
       </View>
 
-      <TouchableOpacity onPress={() => deleteExpense(item.id)}>
-        <Text style={styles.delete}>✕</Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <TouchableOpacity onPress={() => startEdit(item)}>
+          <Text style={styles.edit}>✎</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => deleteExpense(item.id)}>
+          <Text style={styles.delete}>✕</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
    useEffect(() => {
@@ -252,7 +285,12 @@ export default function ExpenseScreen() {
         {datePreview ? (
           <Text style={styles.datePreview}>Preview: {datePreview}</Text>
         ) : null}
-        <Button title="Add Expense" onPress={addExpense} />
+        <View style={styles.formButtons}>
+          <Button title={editingId ? 'Save Changes' : 'Add Expense'} onPress={addExpense} />
+          {editingId ? (
+            <Button title="Cancel" onPress={cancelEdit} color="#9ca3af" />
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.filters}>
@@ -435,6 +473,16 @@ const styles = StyleSheet.create({
     color: '#f87171',
     fontSize: 20,
     marginLeft: 12,
+  },
+  edit: {
+    color: '#60a5fa',
+    fontSize: 18,
+    marginRight: 12,
+  },
+  formButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   empty: {
     color: '#9ca3af',
