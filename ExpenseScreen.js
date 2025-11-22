@@ -96,6 +96,11 @@ export default function ExpenseScreen() {
       return true;
     });
   };
+  const getFilterSum = () => {
+    const list = getDisplayedExpenses();
+    const sum = list.reduce((acc, it) => acc + Number(it.amount || 0), 0);
+    return `$${sum.toFixed(2)}`;
+  };
   const normalizeToISO = (d) => {
     if (!d) return null;
     const s = String(d).replace(/[^0-9]/g, '');
@@ -265,6 +270,11 @@ export default function ExpenseScreen() {
         })()}
       </View>
 
+      <View style={styles.totalRow}>
+        <Text style={styles.totalLabel}>Total ({filter === 'all' ? 'All' : filter === 'week' ? 'This Week' : 'This Month'}):</Text>
+        <Text style={styles.totalValue}>{getFilterSum()}</Text>
+      </View>
+
       <FlatList
         data={getDisplayedExpenses()}
         keyExtractor={(item) => item.id.toString()}
@@ -352,6 +362,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     marginBottom: 4,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: 'transparent',
+    marginBottom: 8,
+  },
+  totalLabel: {
+    color: '#9ca3af',
+    fontSize: 14,
+  },
+  totalValue: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
   delete: {
     color: '#f87171',
