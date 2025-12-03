@@ -148,25 +148,45 @@ export default function ExpenseScreen() {
   };
   const getDailyTotals = () => {
     const list = getDisplayedExpenses();
-    const map = {};
+    const map = {}; // map of date -> { categoryName: amount, ... }
     list.forEach((it) => {
       const date = it.date;
       if (!date) return;
-      map[date] = (map[date] || 0) + Number(it.amount || 0);
+      const cat = it.category || 'Other';
+      if (!map[date]) {
+        map[date] = {};
+      }
+      map[date][cat] = (map[date][cat] || 0) + Number(it.amount || 0);
     });
-    const arr = Object.entries(map).map(([date, total]) => {
+
+    const arr = Object.entries(map).map(([date, categoryMap]) => {
       const dt = new Date(date);
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const dayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const dayName = Number.isNaN(dt.getTime()) ? date : dayNames[dt.getDay()];
       const dayShort = Number.isNaN(dt.getTime()) ? date : dayNamesShort[dt.getDay()];
-      return { date, total, dayName, dayShort };
+      const total = Object.values(categoryMap).reduce((sum, amt) => sum + amt, 0);
+      return { date, total, dayName, dayShort, categories: categoryMap };
     });
     arr.sort((a, b) => a.date.localeCompare(b.date));
     return arr;
   };
 
-  const BAR_MAX_HEIGHT = 220;
+  const BAR_MAX_HEIGHT = 320;
+
+  const getCategoryColor = (category) => {
+    const categoryColors = {
+      'Food': '#10b981',        // green
+      'Books': '#3b82f6',       // blue
+      'Rent': '#f97316',        // orange
+      'Transport': '#8b5cf6',   // purple
+      'Entertainment': '#ec4899', // pink
+      'Utilities': '#06b6d4',   // cyan
+      'Other': '#6b7280',       // gray
+    };
+    return categoryColors[category] || categoryColors['Other'];
+  };
+
   const normalizeToISO = (d) => {
     if (!d) return null;
     const s = String(d).replace(/[^0-9]/g, '');
@@ -216,6 +236,19 @@ export default function ExpenseScreen() {
     if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
     const iso = normalizeToISO(d);
     return iso || d;
+  };
+
+  const formatShortDate = (iso) => {
+    if (!iso) return 'No date';
+    // If ISO like YYYY-MM-DD, return MM/DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+      const m = iso.slice(5, 7);
+      const dd = iso.slice(8, 10);
+      return `${m}/${dd}`;
+    }
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return String(iso);
+    return `${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}`;
   };
 
   const renderExpense = ({ item }) => (
@@ -382,8 +415,20 @@ export default function ExpenseScreen() {
           <Text style={styles.chartHeader}>Spending by Day</Text>
 
           <View style={styles.legendRow}>
-            <View style={styles.legendBox} />
-            <Text style={styles.legendText}>Amount</Text>
+            {(() => {
+              const daily = getDailyTotals();
+              const allCategories = new Set();
+              daily.forEach((d) => {
+                Object.keys(d.categories || {}).forEach((cat) => allCategories.add(cat));
+              });
+              const sortedCats = Array.from(allCategories).sort();
+              return sortedCats.map((cat) => (
+                <View key={cat} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
+                  <View style={[styles.legendBox, { backgroundColor: getCategoryColor(cat) }]} />
+                  <Text style={styles.legendText}>{cat}</Text>
+                </View>
+              ));
+            })()}
           </View>
 
           <View style={styles.chartRow}>
@@ -413,21 +458,30 @@ export default function ExpenseScreen() {
               })()}
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={[styles.chartInner, { position: 'relative', height: BAR_MAX_HEIGHT + 48, paddingTop: 8 }] }>
+              <View style={[styles.chartInner, { position: 'relative', height: BAR_MAX_HEIGHT + 80, paddingTop: 8 }] }>
                   {(() => {
                     const daily = getDailyTotals();
                     if (daily.length === 0) return null;
                     const max = Math.max(1, ...daily.map((d) => d.total));
                     return daily.map((d) => {
-                    const h = Math.round((d.total / max) * BAR_MAX_HEIGHT); // max bar height
                     const label = d.dayShort || (d.dayName ? d.dayName.slice(0,3) : (d.date ? d.date.slice(5) : d.date));
+                    const dateStr = formatShortDate(d.date);
+                    // Get ordered categories for this day
+                    const categoryEntries = Object.entries(d.categories || {});
                     return (
                       <View style={styles.barColumn} key={d.date}>
                         <Text style={styles.barValue}>${d.total.toFixed(0)}</Text>
                         <View style={styles.barArea}>
-                          <View style={[styles.bar, { height: h }]} />
+                          {categoryEntries.map(([cat, amt]) => {
+                            const h = Math.round((amt / max) * BAR_MAX_HEIGHT);
+                            const color = getCategoryColor(cat);
+                            return (
+                              <View key={cat} style={[styles.bar, { height: h, backgroundColor: color, marginBottom: 0 }]} />
+                            );
+                          })}
                         </View>
                         <Text style={styles.barLabel}>{label}</Text>
+                        <Text style={styles.barDate}>{dateStr}</Text>
                       </View>
                     );
                     });
@@ -647,32 +701,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingVertical: 8,
+    minHeight: 360,
   },
   barColumn: {
-    width: 64,
+    width: 96,
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   barValue: {
     color: '#9ca3af',
-    fontSize: 11,
-    marginBottom: 8,
+    fontSize: 12,
+    marginBottom: 10,
   },
   barArea: {
-    height: 220,
+    height: 320,
     justifyContent: 'flex-end',
     alignItems: 'center',
+    flexDirection: 'column',
   },
   bar: {
-    width: 36,
+    width: 48,
     backgroundColor: '#60a5fa',
-    borderRadius: 6,
+    borderRadius: 8,
     marginBottom: 6,
   },
   barLabel: {
     color: '#9ca3af',
     fontSize: 11,
     marginTop: 2,
+  },
+  barDate: {
+    color: '#9ca3af',
+    fontSize: 11,
+    marginTop: 4,
   },
   xAxisLine: {
     position: 'absolute',
