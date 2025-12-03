@@ -22,6 +22,7 @@ export default function ExpenseScreen() {
   const [date, setDate] = useState('');
   const [filter, setFilter] = useState('all'); // 'all' | 'week' | 'month'
   const [datePreview, setDatePreview] = useState(null);
+  const [activeTab, setActiveTab] = useState('list'); // 'list' | 'chart'
   const [editingId, setEditingId] = useState(null);
   const loadExpenses = async () => {
     const rows = await db.getAllAsync(
@@ -258,7 +259,23 @@ export default function ExpenseScreen() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.heading}>Student Expense Tracker</Text>
 
-      <View style={styles.form}>
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'list' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('list')}
+        >
+          <Text style={[styles.tabText, activeTab === 'list' && styles.tabTextActive]}>Expenses</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'chart' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('chart')}
+        >
+          <Text style={[styles.tabText, activeTab === 'chart' && styles.tabTextActive]}>Chart</Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === 'list' ? (
+        <View style={styles.form}>
         <TextInput
           style={styles.input}
           placeholder="Amount (e.g. 12.50)"
@@ -304,7 +321,8 @@ export default function ExpenseScreen() {
             <Button title="Cancel" onPress={cancelEdit} color="#9ca3af" />
           ) : null}
         </View>
-      </View>
+        </View>
+      ) : null}
 
       <View style={styles.filters}>
         {(() => {
@@ -350,34 +368,34 @@ export default function ExpenseScreen() {
           </View>
         ))}
       </View>
-
-      {/* Simple bar chart showing spending by day for the current filter */}
-      <View style={styles.chartContainer}>
-        <Text style={styles.chartHeader}>Spending by Day</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.chartInner}>
-            {(() => {
-              const daily = getDailyTotals();
-              if (daily.length === 0) return <Text style={styles.empty}>No dated expenses to chart.</Text>;
-              const max = Math.max(1, ...daily.map((d) => d.total));
-              return daily.map((d) => {
-                const h = Math.round((d.total / max) * 140); // max bar height
-                const label = d.date ? d.date.slice(5) : d.date; // MM-DD
-                return (
-                  <View style={styles.barColumn} key={d.date}>
-                    <Text style={styles.barValue}>${d.total.toFixed(0)}</Text>
-                    <View style={[styles.bar, { height: h }]} />
-                    <Text style={styles.barLabel}>{label}</Text>
-                  </View>
-                );
-              });
-            })()}
-          </View>
-        </ScrollView>
-      </View>
+      {activeTab === 'chart' ? (
+        <View style={styles.chartContainer}>
+          <Text style={styles.chartHeader}>Spending by Day</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.chartInner}>
+              {(() => {
+                const daily = getDailyTotals();
+                if (daily.length === 0) return <Text style={styles.empty}>No dated expenses to chart.</Text>;
+                const max = Math.max(1, ...daily.map((d) => d.total));
+                return daily.map((d) => {
+                  const h = Math.round((d.total / max) * 140); // max bar height
+                  const label = d.date ? d.date.slice(5) : d.date; // MM-DD
+                  return (
+                    <View style={styles.barColumn} key={d.date}>
+                      <Text style={styles.barValue}>${d.total.toFixed(0)}</Text>
+                      <View style={[styles.bar, { height: h }]} />
+                      <Text style={styles.barLabel}>{label}</Text>
+                    </View>
+                  );
+                });
+              })()}
+            </View>
+          </ScrollView>
+        </View>
+      ) : null}
 
       <FlatList
-        data={getDisplayedExpenses()}
+        data={activeTab === 'list' ? getDisplayedExpenses() : []}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderExpense}
         ListEmptyComponent={
@@ -455,6 +473,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   filterTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    backgroundColor: 'transparent',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  tabButtonActive: {
+    backgroundColor: '#374151',
+  },
+  tabText: {
+    color: '#9ca3af',
+    fontSize: 14,
+  },
+  tabTextActive: {
     color: '#fff',
     fontWeight: '700',
   },
