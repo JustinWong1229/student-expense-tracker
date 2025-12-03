@@ -8,6 +8,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  ScrollView,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -143,6 +144,18 @@ export default function ExpenseScreen() {
     return Object.entries(map)
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total);
+  };
+  const getDailyTotals = () => {
+    const list = getDisplayedExpenses();
+    const map = {};
+    list.forEach((it) => {
+      const date = it.date;
+      if (!date) return;
+      map[date] = (map[date] || 0) + Number(it.amount || 0);
+    });
+    const arr = Object.entries(map).map(([date, total]) => ({ date, total }));
+    arr.sort((a, b) => a.date.localeCompare(b.date));
+    return arr;
   };
   const normalizeToISO = (d) => {
     if (!d) return null;
@@ -338,6 +351,31 @@ export default function ExpenseScreen() {
         ))}
       </View>
 
+      {/* Simple bar chart showing spending by day for the current filter */}
+      <View style={styles.chartContainer}>
+        <Text style={styles.chartHeader}>Spending by Day</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.chartInner}>
+            {(() => {
+              const daily = getDailyTotals();
+              if (daily.length === 0) return <Text style={styles.empty}>No dated expenses to chart.</Text>;
+              const max = Math.max(1, ...daily.map((d) => d.total));
+              return daily.map((d) => {
+                const h = Math.round((d.total / max) * 140); // max bar height
+                const label = d.date ? d.date.slice(5) : d.date; // MM-DD
+                return (
+                  <View style={styles.barColumn} key={d.date}>
+                    <Text style={styles.barValue}>${d.total.toFixed(0)}</Text>
+                    <View style={[styles.bar, { height: h }]} />
+                    <Text style={styles.barLabel}>{label}</Text>
+                  </View>
+                );
+              });
+            })()}
+          </View>
+        </ScrollView>
+      </View>
+
       <FlatList
         data={getDisplayedExpenses()}
         keyExtractor={(item) => item.id.toString()}
@@ -468,6 +506,42 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
+  },
+  chartContainer: {
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  chartHeader: {
+    color: '#e5e7eb',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  chartInner: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingVertical: 8,
+  },
+  barColumn: {
+    width: 48,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  barValue: {
+    color: '#9ca3af',
+    fontSize: 11,
+    marginBottom: 6,
+  },
+  bar: {
+    width: 28,
+    backgroundColor: '#60a5fa',
+    borderRadius: 4,
+    marginBottom: 6,
+  },
+  barLabel: {
+    color: '#9ca3af',
+    fontSize: 11,
+    marginTop: 2,
   },
   delete: {
     color: '#f87171',
