@@ -154,10 +154,19 @@ export default function ExpenseScreen() {
       if (!date) return;
       map[date] = (map[date] || 0) + Number(it.amount || 0);
     });
-    const arr = Object.entries(map).map(([date, total]) => ({ date, total }));
+    const arr = Object.entries(map).map(([date, total]) => {
+      const dt = new Date(date);
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const dayName = Number.isNaN(dt.getTime()) ? date : dayNames[dt.getDay()];
+      const dayShort = Number.isNaN(dt.getTime()) ? date : dayNamesShort[dt.getDay()];
+      return { date, total, dayName, dayShort };
+    });
     arr.sort((a, b) => a.date.localeCompare(b.date));
     return arr;
   };
+
+  const BAR_MAX_HEIGHT = 220;
   const normalizeToISO = (d) => {
     if (!d) return null;
     const s = String(d).replace(/[^0-9]/g, '');
@@ -371,26 +380,64 @@ export default function ExpenseScreen() {
       {activeTab === 'chart' ? (
         <View style={styles.chartContainer}>
           <Text style={styles.chartHeader}>Spending by Day</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.chartInner}>
+
+          <View style={styles.legendRow}>
+            <View style={styles.legendBox} />
+            <Text style={styles.legendText}>Amount</Text>
+          </View>
+
+          <View style={styles.chartRow}>
+            {/* Y axis */}
               {(() => {
                 const daily = getDailyTotals();
                 if (daily.length === 0) return <Text style={styles.empty}>No dated expenses to chart.</Text>;
                 const max = Math.max(1, ...daily.map((d) => d.total));
-                return daily.map((d) => {
-                  const h = Math.round((d.total / max) * 140); // max bar height
-                  const label = d.date ? d.date.slice(5) : d.date; // MM-DD
-                  return (
-                    <View style={styles.barColumn} key={d.date}>
-                      <Text style={styles.barValue}>${d.total.toFixed(0)}</Text>
-                      <View style={[styles.bar, { height: h }]} />
-                      <Text style={styles.barLabel}>{label}</Text>
-                    </View>
-                  );
-                });
+                // round max up to nearest 5 and use $5 ticks
+                const maxRounded = Math.ceil(max / 5) * 5;
+                const ticks = [];
+                for (let v = 0; v <= maxRounded; v += 5) ticks.push(v);
+
+                return (
+                  <View style={[styles.yAxis, { height: BAR_MAX_HEIGHT, position: 'relative' }] }>
+                    {ticks.map((t) => {
+                      const top = Math.round((1 - t / maxRounded) * BAR_MAX_HEIGHT);
+                      return (
+                        <Text
+                          key={String(t)}
+                          style={[styles.yTickAbsolute, { top: Math.max(0, top - 8) }]}
+                        >{`$${t}`}</Text>
+                      );
+                    })}
+                  </View>
+                );
               })()}
-            </View>
-          </ScrollView>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={[styles.chartInner, { position: 'relative', height: BAR_MAX_HEIGHT + 48, paddingTop: 8 }] }>
+                  {(() => {
+                    const daily = getDailyTotals();
+                    if (daily.length === 0) return null;
+                    const max = Math.max(1, ...daily.map((d) => d.total));
+                    return daily.map((d) => {
+                    const h = Math.round((d.total / max) * BAR_MAX_HEIGHT); // max bar height
+                    const label = d.dayShort || (d.dayName ? d.dayName.slice(0,3) : (d.date ? d.date.slice(5) : d.date));
+                    return (
+                      <View style={styles.barColumn} key={d.date}>
+                        <Text style={styles.barValue}>${d.total.toFixed(0)}</Text>
+                        <View style={styles.barArea}>
+                          <View style={[styles.bar, { height: h }]} />
+                        </View>
+                        <Text style={styles.barLabel}>{label}</Text>
+                      </View>
+                    );
+                    });
+                  })()}
+
+                {/* x-axis line */}
+                <View style={[styles.xAxisLine, { top: BAR_MAX_HEIGHT + 8 }]} />
+              </View>
+            </ScrollView>
+          </View>
         </View>
       ) : null}
 
@@ -558,31 +605,83 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 6,
   },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  legendBox: {
+    width: 12,
+    height: 12,
+    backgroundColor: '#60a5fa',
+    marginRight: 8,
+    borderRadius: 2,
+  },
+  legendText: {
+    color: '#9ca3af',
+    fontSize: 12,
+  },
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  yAxis: {
+    width: 56,
+    alignItems: 'flex-end',
+    paddingRight: 8,
+    justifyContent: 'space-between',
+  },
+  yTick: {
+    color: '#9ca3af',
+    fontSize: 11,
+    textAlign: 'right',
+  },
+  yTickAbsolute: {
+    position: 'absolute',
+    right: 0,
+    color: '#9ca3af',
+    fontSize: 11,
+    textAlign: 'right',
+  },
   chartInner: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
     paddingVertical: 8,
   },
   barColumn: {
-    width: 48,
+    width: 64,
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 12,
   },
   barValue: {
     color: '#9ca3af',
     fontSize: 11,
-    marginBottom: 6,
+    marginBottom: 8,
+  },
+  barArea: {
+    height: 220,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   bar: {
-    width: 28,
+    width: 36,
     backgroundColor: '#60a5fa',
-    borderRadius: 4,
+    borderRadius: 6,
     marginBottom: 6,
   },
   barLabel: {
     color: '#9ca3af',
     fontSize: 11,
     marginTop: 2,
+  },
+  xAxisLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    height: 1,
+    backgroundColor: '#374151',
+    zIndex: 0,
   },
   delete: {
     color: '#f87171',
