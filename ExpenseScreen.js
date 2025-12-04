@@ -561,9 +561,9 @@ export default function ExpenseScreen() {
 
               const max = Math.max(1, ...daily.map((d) => d.total));
               const maxRounded = Math.ceil(max / 10) * 10;
-              const ticks = [];
-              for (let v = 0; v <= maxRounded; v += maxRounded / 5) {
-                if (ticks.length <= 5) ticks.push(Math.round(v));
+              const ticks = [0];
+              for (let v = maxRounded / 5; v <= maxRounded; v += maxRounded / 5) {
+                if (ticks.length < 5) ticks.push(Math.round(v));
               }
 
               return (
@@ -654,7 +654,7 @@ export default function ExpenseScreen() {
 
                 {/* x-axis line */}
                 <View
-                  style={[styles.xAxisLine, { top: BAR_MAX_HEIGHT + 8 }]}
+                  style={[styles.xAxisLine, { top: BAR_MAX_HEIGHT + 40 }]}
                 />
               </View>
             </ScrollView>
@@ -909,6 +909,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     flexDirection: 'column',
+    paddingBottom: 4,
   },
   bar: {
     width: 48,
