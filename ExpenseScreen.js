@@ -47,7 +47,11 @@ export default function ExpenseScreen() {
       return;
     }
 
-    const isoDate = normalizeToISO(trimmedDate) || null;
+    const isoDate = normalizeToISO(trimmedDate);
+    
+    if (!isoDate) {
+      return;
+    }
 
     if (editingId) {
       await db.runAsync(
@@ -388,7 +392,7 @@ export default function ExpenseScreen() {
           />
           <TextInput
             style={styles.input}
-            placeholder="Date (optional)"
+            placeholder="Date (required, format: MMDDYYYY)"
             placeholderTextColor="#9ca3af"
             keyboardType="numeric"
             maxLength={8}
@@ -671,7 +675,7 @@ export default function ExpenseScreen() {
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderExpense}
         ListEmptyComponent={
-          <Text style={styles.empty}>No expenses yet.</Text>
+          activeTab === 'list' ? <Text style={styles.empty}>No expenses yet.</Text> : null
         }
       />
 
