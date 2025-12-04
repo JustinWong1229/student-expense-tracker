@@ -637,7 +637,7 @@ export default function ExpenseScreen() {
                     return (
                       <View style={styles.barColumn} key={d.date}>
                         <Text style={styles.barValue}>
-                          ${d.total.toFixed(0)}
+                          ${d.total.toFixed(2)}
                         </Text>
                         <View style={styles.barArea}>
                           {categoryEntries.map(([cat, amt]) => {
