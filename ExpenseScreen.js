@@ -518,7 +518,15 @@ export default function ExpenseScreen() {
 
       {activeTab === 'chart' ? (
         <View style={styles.chartContainer}>
-          <Text style={styles.chartHeader}>Spending by Day</Text>
+          <Text style={styles.chartHeader}>
+            {filter === 'week'
+              ? 'Spending by Week'
+              : filter === 'month'
+              ? 'Spending by Month'
+              : filter === 'all'
+              ? 'Total Spending'
+              : 'Spending by Day'}
+          </Text>
 
           {/* Legend */}
           <View style={styles.legendRow}>
