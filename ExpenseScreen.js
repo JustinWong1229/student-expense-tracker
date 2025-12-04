@@ -324,6 +324,7 @@ export default function ExpenseScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
       <Text style={styles.heading}>Student Expense Tracker</Text>
 
       <View style={styles.tabBar}>
@@ -675,14 +676,17 @@ export default function ExpenseScreen() {
       />
 
       <Text style={styles.footer}>
-        Enter your expenses and they’ll be saved locally with SQLite.
+        Enter your expenses and they'll be saved locally with SQLite.
       </Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#111827' },
+  container: { flex: 1, backgroundColor: '#111827' },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 16 },
   heading: {
     fontSize: 24,
     fontWeight: '700',
