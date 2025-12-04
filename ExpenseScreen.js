@@ -24,17 +24,18 @@ export default function ExpenseScreen() {
   const [datePreview, setDatePreview] = useState(null);
   const [activeTab, setActiveTab] = useState('list'); // 'list' | 'chart'
   const [editingId, setEditingId] = useState(null);
+
   const loadExpenses = async () => {
     const rows = await db.getAllAsync(
       'SELECT * FROM expenses ORDER BY id DESC;'
     );
     setExpenses(rows);
   };
+
   const addExpense = async () => {
     const amountNumber = parseFloat(amount);
 
     if (isNaN(amountNumber) || amountNumber <= 0) {
-      // Basic validation: ignore invalid or non-positive amounts
       return;
     }
 
@@ -43,7 +44,6 @@ export default function ExpenseScreen() {
     const trimmedDate = date.trim();
 
     if (!trimmedCategory) {
-      // Category is required
       return;
     }
 
@@ -76,7 +76,6 @@ export default function ExpenseScreen() {
     setAmount(String(item.amount));
     setCategory(item.category || '');
     setNote(item.note || '');
-    // store digits only in input, preview shows normalized
     setDate(item.date ? String(item.date).replace(/[^0-9]/g, '') : '');
     setDatePreview(item.date || null);
   };
@@ -89,17 +88,18 @@ export default function ExpenseScreen() {
     setDate('');
     setDatePreview(null);
   };
+
   const deleteExpense = async (id) => {
     await db.runAsync('DELETE FROM expenses WHERE id = ?;', [id]);
     loadExpenses();
   };
+
   const isDateInCurrentWeek = (dateStr) => {
     if (!dateStr) return false;
     const [y, m, d] = dateStr.split('-').map(Number);
     const dt = new Date(y, m - 1, d);
     const now = new Date();
     const start = new Date(now);
-    // Week starts on Sunday (0)
     start.setHours(0, 0, 0, 0);
     start.setDate(now.getDate() - now.getDay());
     const end = new Date(start);
@@ -113,7 +113,10 @@ export default function ExpenseScreen() {
     const [y, m, d] = dateStr.split('-').map(Number);
     const dt = new Date(y, m - 1, d);
     const now = new Date();
-    return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth();
+    return (
+      dt.getFullYear() === now.getFullYear() &&
+      dt.getMonth() === now.getMonth()
+    );
   };
 
   const getDisplayedExpenses = () => {
@@ -126,6 +129,7 @@ export default function ExpenseScreen() {
       return true;
     });
   };
+
   const getFilterSum = () => {
     const list = getDisplayedExpenses();
     const sum = list.reduce((acc, it) => acc + Number(it.amount || 0), 0);
@@ -146,9 +150,10 @@ export default function ExpenseScreen() {
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total);
   };
+
   const getDailyTotals = () => {
     const list = getDisplayedExpenses();
-    const map = {}; // map of date -> { categoryName: amount, ... }
+    const map = {};
     list.forEach((it) => {
       const date = it.date;
       if (!date) return;
@@ -161,11 +166,26 @@ export default function ExpenseScreen() {
 
     const arr = Object.entries(map).map(([date, categoryMap]) => {
       const dt = new Date(date);
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayNames = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ];
       const dayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const dayName = Number.isNaN(dt.getTime()) ? date : dayNames[dt.getDay()];
-      const dayShort = Number.isNaN(dt.getTime()) ? date : dayNamesShort[dt.getDay()];
-      const total = Object.values(categoryMap).reduce((sum, amt) => sum + amt, 0);
+      const dayName = Number.isNaN(dt.getTime())
+        ? date
+        : dayNames[dt.getDay()];
+      const dayShort = Number.isNaN(dt.getTime())
+        ? date
+        : dayNamesShort[dt.getDay()];
+      const total = Object.values(categoryMap).reduce(
+        (sum, amt) => sum + amt,
+        0
+      );
       return { date, total, dayName, dayShort, categories: categoryMap };
     });
     arr.sort((a, b) => a.date.localeCompare(b.date));
@@ -176,13 +196,13 @@ export default function ExpenseScreen() {
 
   const getCategoryColor = (category) => {
     const categoryColors = {
-      'Food': '#10b981',        // green
-      'Books': '#3b82f6',       // blue
-      'Rent': '#f97316',        // orange
-      'Transport': '#8b5cf6',   // purple
-      'Entertainment': '#ec4899', // pink
-      'Utilities': '#06b6d4',   // cyan
-      'Other': '#6b7280',       // gray
+      Food: '#10b981',
+      Books: '#3b82f6',
+      Rent: '#f97316',
+      Transport: '#8b5cf6',
+      Entertainment: '#ec4899',
+      Utilities: '#06b6d4',
+      Other: '#6b7280',
     };
     return categoryColors[category] || categoryColors['Other'];
   };
@@ -191,7 +211,6 @@ export default function ExpenseScreen() {
     if (!d) return null;
     const s = String(d).replace(/[^0-9]/g, '');
 
-    // Helper to validate numeric ranges
     const valid = (y, m, day) => {
       const yi = parseInt(y, 10);
       const mi = parseInt(m, 10);
@@ -202,19 +221,20 @@ export default function ExpenseScreen() {
       return true;
     };
 
-    // If 8 digits and looks like YYYYMMDD, use that
     if (s.length === 8) {
       const maybeYear = s.slice(0, 4);
       const maybeMonth = s.slice(4, 6);
       const maybeDay = s.slice(6, 8);
       const yNum = parseInt(maybeYear, 10);
-      if (yNum >= 1900 && yNum <= 2100 && valid(maybeYear, maybeMonth, maybeDay)) {
+      if (
+        yNum >= 1900 &&
+        yNum <= 2100 &&
+        valid(maybeYear, maybeMonth, maybeDay)
+      ) {
         return `${maybeYear}-${maybeMonth}-${maybeDay}`;
       }
-      // else fall through and treat as MMDDYYYY
     }
 
-    // If we have at least 5 digits, assume last 4 are the year
     if (s.length >= 5) {
       const year = s.slice(-4);
       const rest = s.slice(0, -4);
@@ -232,7 +252,6 @@ export default function ExpenseScreen() {
 
   const formatDate = (d) => {
     if (!d) return null;
-    // If already ISO, return as-is
     if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
     const iso = normalizeToISO(d);
     return iso || d;
@@ -240,7 +259,6 @@ export default function ExpenseScreen() {
 
   const formatShortDate = (iso) => {
     if (!iso) return 'No date';
-    // If ISO like YYYY-MM-DD, return MM/DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
       const m = iso.slice(5, 7);
       const dd = iso.slice(8, 10);
@@ -248,16 +266,22 @@ export default function ExpenseScreen() {
     }
     const dt = new Date(iso);
     if (Number.isNaN(dt.getTime())) return String(iso);
-    return `${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}`;
+    return `${String(dt.getMonth() + 1).padStart(2, '0')}/${String(
+      dt.getDate()
+    ).padStart(2, '0')}`;
   };
 
   const renderExpense = ({ item }) => (
     <View style={styles.expenseRow}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.expenseAmount}>${Number(item.amount).toFixed(2)}</Text>
+        <Text style={styles.expenseAmount}>
+          ${Number(item.amount).toFixed(2)}
+        </Text>
         <Text style={styles.expenseCategory}>{item.category}</Text>
         {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
-        {item.date ? <Text style={styles.expenseDate}>{formatDate(item.date)}</Text> : null}
+        {item.date ? (
+          <Text style={styles.expenseDate}>{formatDate(item.date)}</Text>
+        ) : null}
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -270,7 +294,8 @@ export default function ExpenseScreen() {
       </View>
     </View>
   );
-   useEffect(() => {
+
+  useEffect(() => {
     async function setup() {
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS expenses (
@@ -281,7 +306,6 @@ export default function ExpenseScreen() {
         );
       `);
 
-      // Ensure a `date` column exists on older databases
       try {
         const cols = await db.getAllAsync(`PRAGMA table_info(expenses);`);
         const hasDate = cols.some((c) => c.name === 'date');
@@ -289,7 +313,7 @@ export default function ExpenseScreen() {
           await db.runAsync(`ALTER TABLE expenses ADD COLUMN date TEXT;`);
         }
       } catch (e) {
-        // If PRAGMA or ALTER fails, ignore and continue — table may not exist yet
+        // ignore
       }
 
       await loadExpenses();
@@ -297,99 +321,157 @@ export default function ExpenseScreen() {
 
     setup();
   }, []);
-   return (
+
+  return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.heading}>Student Expense Tracker</Text>
 
       <View style={styles.tabBar}>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'list' && styles.tabButtonActive]}
+          style={[
+            styles.tabButton,
+            activeTab === 'list' && styles.tabButtonActive,
+          ]}
           onPress={() => setActiveTab('list')}
         >
-          <Text style={[styles.tabText, activeTab === 'list' && styles.tabTextActive]}>Expenses</Text>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'list' && styles.tabTextActive,
+            ]}
+          >
+            Expenses
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'chart' && styles.tabButtonActive]}
+          style={[
+            styles.tabButton,
+            activeTab === 'chart' && styles.tabButtonActive,
+          ]}
           onPress={() => setActiveTab('chart')}
         >
-          <Text style={[styles.tabText, activeTab === 'chart' && styles.tabTextActive]}>Chart</Text>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'chart' && styles.tabTextActive,
+            ]}
+          >
+            Chart
+          </Text>
         </TouchableOpacity>
       </View>
 
       {activeTab === 'list' ? (
         <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Amount (e.g. 12.50)"
-          placeholderTextColor="#9ca3af"
-          keyboardType="numeric"
-          value={amount}
-          onChangeText={setAmount}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Category (Food, Books, Rent...)"
-          placeholderTextColor="#9ca3af"
-          value={category}
-          onChangeText={setCategory}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Note (optional)"
-          placeholderTextColor="#9ca3af"
-          value={note}
-          onChangeText={setNote}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Date (optional)"
-          placeholderTextColor="#9ca3af"
-          keyboardType="numeric"
-          maxLength={8}
-          value={date}
-          onChangeText={(t) => {
-            const clean = t.replace(/[^0-9]/g, '');
-            setDate(clean);
-            const iso = normalizeToISO(clean);
-            setDatePreview(iso || (clean ? 'Invalid date' : null));
-          }}
-        />
-        {datePreview ? (
-          <Text style={styles.datePreview}>Preview: {datePreview}</Text>
-        ) : null}
-        <View style={styles.formButtons}>
-          <Button title={editingId ? 'Save Changes' : 'Add Expense'} onPress={addExpense} />
-          {editingId ? (
-            <Button title="Cancel" onPress={cancelEdit} color="#9ca3af" />
+          <TextInput
+            style={styles.input}
+            placeholder="Amount (e.g. 12.50)"
+            placeholderTextColor="#9ca3af"
+            keyboardType="numeric"
+            value={amount}
+            onChangeText={setAmount}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Category (Food, Books, Rent...)"
+            placeholderTextColor="#9ca3af"
+            value={category}
+            onChangeText={setCategory}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Note (optional)"
+            placeholderTextColor="#9ca3af"
+            value={note}
+            onChangeText={setNote}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Date (optional)"
+            placeholderTextColor="#9ca3af"
+            keyboardType="numeric"
+            maxLength={8}
+            value={date}
+            onChangeText={(t) => {
+              const clean = t.replace(/[^0-9]/g, '');
+              setDate(clean);
+              const iso = normalizeToISO(clean);
+              setDatePreview(iso || (clean ? 'Invalid date' : null));
+            }}
+          />
+          {datePreview ? (
+            <Text style={styles.datePreview}>Preview: {datePreview}</Text>
           ) : null}
-        </View>
+          <View style={styles.formButtons}>
+            <Button
+              title={editingId ? 'Save Changes' : 'Add Expense'}
+              onPress={addExpense}
+            />
+            {editingId ? (
+              <Button title="Cancel" onPress={cancelEdit} color="#9ca3af" />
+            ) : null}
+          </View>
         </View>
       ) : null}
 
       <View style={styles.filters}>
         {(() => {
           const allCount = expenses.length;
-          const weekCount = expenses.filter((it) => it.date && isDateInCurrentWeek(it.date)).length;
-          const monthCount = expenses.filter((it) => it.date && isDateInCurrentMonth(it.date)).length;
+          const weekCount = expenses.filter(
+            (it) => it.date && isDateInCurrentWeek(it.date)
+          ).length;
+          const monthCount = expenses.filter(
+            (it) => it.date && isDateInCurrentMonth(it.date)
+          ).length;
           return (
             <>
               <TouchableOpacity
-                style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
+                style={[
+                  styles.filterButton,
+                  filter === 'all' && styles.filterButtonActive,
+                ]}
                 onPress={() => setFilter('all')}
               >
-                <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>All ({allCount})</Text>
+                <Text
+                  style={[
+                    styles.filterText,
+                    filter === 'all' && styles.filterTextActive,
+                  ]}
+                >
+                  All ({allCount})
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.filterButton, filter === 'week' && styles.filterButtonActive]}
+                style={[
+                  styles.filterButton,
+                  filter === 'week' && styles.filterButtonActive,
+                ]}
                 onPress={() => setFilter('week')}
               >
-                <Text style={[styles.filterText, filter === 'week' && styles.filterTextActive]}>This Week ({weekCount})</Text>
+                <Text
+                  style={[
+                    styles.filterText,
+                    filter === 'week' && styles.filterTextActive,
+                  ]}
+                >
+                  This Week ({weekCount})
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.filterButton, filter === 'month' && styles.filterButtonActive]}
+                style={[
+                  styles.filterButton,
+                  filter === 'month' && styles.filterButtonActive,
+                ]}
                 onPress={() => setFilter('month')}
               >
-                <Text style={[styles.filterText, filter === 'month' && styles.filterTextActive]}>This Month ({monthCount})</Text>
+                <Text
+                  style={[
+                    styles.filterText,
+                    filter === 'month' && styles.filterTextActive,
+                  ]}
+                >
+                  This Month ({monthCount})
+                </Text>
               </TouchableOpacity>
             </>
           );
@@ -397,86 +479,167 @@ export default function ExpenseScreen() {
       </View>
 
       <View style={styles.totalRow}>
-        <Text style={styles.totalLabel}>Total ({filter === 'all' ? 'All' : filter === 'week' ? 'This Week' : 'This Month'}):</Text>
+        <Text style={styles.totalLabel}>
+          Total (
+          {filter === 'all'
+            ? 'All'
+            : filter === 'week'
+            ? 'This Week'
+            : 'This Month'}
+          ):
+        </Text>
         <Text style={styles.totalValue}>{getFilterSum()}</Text>
       </View>
 
       <View style={styles.categoryBreakdown}>
-        <Text style={styles.categoryHeader}>By Category ({filter === 'all' ? 'All' : filter === 'week' ? 'This Week' : 'This Month'}):</Text>
+        <Text style={styles.categoryHeader}>
+          By Category (
+          {filter === 'all'
+            ? 'All'
+            : filter === 'week'
+            ? 'This Week'
+            : 'This Month'}
+          ):
+        </Text>
         {getTotalsByCategory().map((c) => (
           <View style={styles.categoryRow} key={c.category}>
             <Text style={styles.categoryName}>• {c.category}</Text>
-            <Text style={styles.categoryAmount}>${c.total.toFixed(2)}</Text>
+            <Text style={styles.categoryAmount}>
+              ${c.total.toFixed(2)}
+            </Text>
           </View>
         ))}
       </View>
+
       {activeTab === 'chart' ? (
         <View style={styles.chartContainer}>
           <Text style={styles.chartHeader}>Spending by Day</Text>
 
+          {/* Legend */}
           <View style={styles.legendRow}>
             {(() => {
               const daily = getDailyTotals();
               const allCategories = new Set();
               daily.forEach((d) => {
-                Object.keys(d.categories || {}).forEach((cat) => allCategories.add(cat));
+                Object.keys(d.categories || {}).forEach((cat) =>
+                  allCategories.add(cat)
+                );
               });
               const sortedCats = Array.from(allCategories).sort();
               return sortedCats.map((cat) => (
-                <View key={cat} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
-                  <View style={[styles.legendBox, { backgroundColor: getCategoryColor(cat) }]} />
+                <View
+                  key={cat}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginRight: 12,
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.legendBox,
+                      { backgroundColor: getCategoryColor(cat) },
+                    ]}
+                  />
                   <Text style={styles.legendText}>{cat}</Text>
                 </View>
               ));
             })()}
           </View>
 
+          {/* Chart + axes */}
           <View style={styles.chartRow}>
-            {/* Y axis */}
-              {(() => {
-                const daily = getDailyTotals();
-                if (daily.length === 0) return <Text style={styles.empty}>No dated expenses to chart.</Text>;
-                const max = Math.max(1, ...daily.map((d) => d.total));
-                // round max up to nearest 5 and use $5 ticks
-                const maxRounded = Math.ceil(max / 5) * 5;
-                const ticks = [];
-                for (let v = 0; v <= maxRounded; v += 5) ticks.push(v);
-
+            {/* Y-axis label + ticks in same column */}
+            {(() => {
+              const daily = getDailyTotals();
+              if (daily.length === 0) {
                 return (
-                  <View style={[styles.yAxis, { height: BAR_MAX_HEIGHT, position: 'relative' }] }>
+                  <View style={styles.yAxisWithLabel}>
+                    <Text style={styles.yAxisLabel}>Price</Text>
+                  </View>
+                );
+              }
+
+              const max = Math.max(1, ...daily.map((d) => d.total));
+              const maxRounded = Math.ceil(max / 5) * 5;
+              const ticks = [];
+              for (let v = 0; v <= maxRounded; v += 5) ticks.push(v);
+
+              return (
+                <View style={styles.yAxisWithLabel}>
+                  <Text style={styles.yAxisLabel}>Price</Text>
+                  <View
+                    style={[
+                      styles.yAxis,
+                      { height: BAR_MAX_HEIGHT, position: 'relative' },
+                    ]}
+                  >
                     {ticks.map((t) => {
-                      const top = Math.round((1 - t / maxRounded) * BAR_MAX_HEIGHT);
+                      const top = Math.round(
+                        (1 - t / maxRounded) * BAR_MAX_HEIGHT
+                      );
                       return (
                         <Text
                           key={String(t)}
-                          style={[styles.yTickAbsolute, { top: Math.max(0, top - 8) }]}
+                          style={[
+                            styles.yTickAbsolute,
+                            { top: Math.max(0, top - 8) },
+                          ]}
                         >{`$${t}`}</Text>
                       );
                     })}
                   </View>
-                );
-              })()}
+                </View>
+              );
+            })()}
 
+            {/* Bars */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={[styles.chartInner, { position: 'relative', height: BAR_MAX_HEIGHT + 80, paddingTop: 8 }] }>
-                  {(() => {
-                    const daily = getDailyTotals();
-                    if (daily.length === 0) return null;
-                    const max = Math.max(1, ...daily.map((d) => d.total));
-                    return daily.map((d) => {
-                    const label = d.dayShort || (d.dayName ? d.dayName.slice(0,3) : (d.date ? d.date.slice(5) : d.date));
+              <View
+                style={[
+                  styles.chartInner,
+                  {
+                    position: 'relative',
+                    height: BAR_MAX_HEIGHT + 80,
+                    paddingTop: 8,
+                  },
+                ]}
+              >
+                {(() => {
+                  const daily = getDailyTotals();
+                  if (daily.length === 0) return null;
+                  const max = Math.max(1, ...daily.map((d) => d.total));
+                  return daily.map((d) => {
+                    const label =
+                      d.dayShort ||
+                      (d.dayName
+                        ? d.dayName.slice(0, 3)
+                        : d.date
+                        ? d.date.slice(5)
+                        : d.date);
                     const dateStr = formatShortDate(d.date);
-                    // Get ordered categories for this day
                     const categoryEntries = Object.entries(d.categories || {});
                     return (
                       <View style={styles.barColumn} key={d.date}>
-                        <Text style={styles.barValue}>${d.total.toFixed(0)}</Text>
+                        <Text style={styles.barValue}>
+                          ${d.total.toFixed(0)}
+                        </Text>
                         <View style={styles.barArea}>
                           {categoryEntries.map(([cat, amt]) => {
                             const h = Math.round((amt / max) * BAR_MAX_HEIGHT);
                             const color = getCategoryColor(cat);
                             return (
-                              <View key={cat} style={[styles.bar, { height: h, backgroundColor: color, marginBottom: 0 }]} />
+                              <View
+                                key={cat}
+                                style={[
+                                  styles.bar,
+                                  {
+                                    height: h,
+                                    backgroundColor: color,
+                                    marginBottom: 0,
+                                  },
+                                ]}
+                              />
                             );
                           })}
                         </View>
@@ -484,14 +647,19 @@ export default function ExpenseScreen() {
                         <Text style={styles.barDate}>{dateStr}</Text>
                       </View>
                     );
-                    });
-                  })()}
+                  });
+                })()}
 
                 {/* x-axis line */}
-                <View style={[styles.xAxisLine, { top: BAR_MAX_HEIGHT + 8 }]} />
+                <View
+                  style={[styles.xAxisLine, { top: BAR_MAX_HEIGHT + 8 }]}
+                />
               </View>
             </ScrollView>
           </View>
+
+          {/* X-axis label */}
+          <Text style={styles.xAxisLabel}>Date and time</Text>
         </View>
       ) : null}
 
@@ -510,6 +678,7 @@ export default function ExpenseScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#111827' },
   heading: {
@@ -679,8 +848,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
+
+  // Y axis = label + ticks stacked vertically
+  yAxisWithLabel: {
+    width: 70,
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  yAxisLabel: {
+    color: '#9ca3af',
+    fontSize: 12,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
   yAxis: {
-    width: 56,
+    width: '100%',
     alignItems: 'flex-end',
     paddingRight: 8,
     justifyContent: 'space-between',
@@ -740,10 +922,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    height: 1,
     backgroundColor: '#374151',
     zIndex: 0,
   },
+  // X axis label
+  xAxisLabel: {
+    color: '#9ca3af',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+
   delete: {
     color: '#f87171',
     fontSize: 20,
@@ -771,4 +960,3 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
-    
