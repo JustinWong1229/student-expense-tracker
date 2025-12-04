@@ -555,25 +555,26 @@ export default function ExpenseScreen() {
               if (daily.length === 0) {
                 return (
                   <View style={styles.yAxisWithLabel}>
-                    <Text style={styles.yAxisLabel}>Price</Text>
                   </View>
                 );
               }
 
               const max = Math.max(1, ...daily.map((d) => d.total));
-              const maxRounded = Math.ceil(max / 5) * 5;
+              const maxRounded = Math.ceil(max / 10) * 10;
               const ticks = [];
-              for (let v = 0; v <= maxRounded; v += 5) ticks.push(v);
+              for (let v = 0; v <= maxRounded; v += maxRounded / 5) {
+                if (ticks.length <= 5) ticks.push(Math.round(v));
+              }
 
               return (
                 <View style={styles.yAxisWithLabel}>
-                  <Text style={styles.yAxisLabel}>Price</Text>
                   <View
                     style={[
                       styles.yAxis,
                       { height: BAR_MAX_HEIGHT, position: 'relative' },
                     ]}
                   >
+                    <Text style={styles.yAxisLabel}>Price</Text>
                     {ticks.map((t) => {
                       const top = Math.round(
                         (1 - t / maxRounded) * BAR_MAX_HEIGHT
@@ -601,7 +602,8 @@ export default function ExpenseScreen() {
                   {
                     position: 'relative',
                     height: BAR_MAX_HEIGHT + 80,
-                    paddingTop: 8,
+                    paddingTop: 20,
+                    paddingBottom: 20,
                   },
                 ]}
               >
@@ -659,7 +661,7 @@ export default function ExpenseScreen() {
           </View>
 
           {/* X-axis label */}
-          <Text style={styles.xAxisLabel}>Date and time</Text>
+          <Text style={styles.xAxisLabel}>Day and date</Text>
         </View>
       ) : null}
 
@@ -854,12 +856,18 @@ const styles = StyleSheet.create({
     width: 70,
     alignItems: 'center',
     marginRight: 4,
+    paddingLeft: 8,
   },
   yAxisLabel: {
     color: '#9ca3af',
     fontSize: 12,
-    marginBottom: 4,
     textAlign: 'center',
+    transform: [{ rotate: '-90deg' }],
+    width: 320,
+    height: 20,
+    position: 'absolute',
+    top: '50%',
+    left: -150,
   },
   yAxis: {
     width: '100%',
@@ -874,6 +882,7 @@ const styles = StyleSheet.create({
   },
   yTickAbsolute: {
     position: 'absolute',
+    fontSize: 12,
     right: 0,
     color: '#9ca3af',
     fontSize: 11,
